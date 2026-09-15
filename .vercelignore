@@ -1,0 +1,5 @@
+# Docs stay in the repo for reviewers but are not served on the live site:
+# a static root deploy serves everything at the root, so a file like README.md
+# would be fetchable next to the game itself. It describes the layer the game
+# deliberately keeps off the screen.
+*.md
