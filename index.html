@@ -1,0 +1,1791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Are We Cooked?</title>
+<style>
+/* ---------------------------------------------------------------
+   Are We Cooked? — pass-and-play prototype
+   Plain HTML/CSS/JS. No build step, no backend, nothing persisted.
+   --------------------------------------------------------------- */
+
+:root{
+  /* ---- STATIONS ----------------------------------------------------------
+     One family, not five isolated picks: even lightness (all read at the same
+     weight), even hue spacing, and all five pitched brighter than any ambient
+     light in the room — so Grill stays separable from the red Closing lamp and
+     Sauté from the amber Dinner one. */
+  --grill:#ff6b57;          /* vermilion */
+  --prep:#59a7f0;           /* azure     */
+  --saute:#f7b23f;          /* amber     */
+  --garde-manger:#4fc98c;   /* mint      */
+  --expo:#a98cff;           /* violet    */
+  --badge-ink:#11151b;      /* type on a station-coloured pill */
+
+  /* ---- NEUTRALS ----------------------------------------------------------
+     One ramp, one hue (a cold blue-grey ~218°), low chroma throughout. Every
+     surface in the app is a step on this ramp — nothing is "tinted brown". */
+  --n-900:#0a0d12;
+  --n-800:#121821;
+  --n-700:#1a212b;
+  --n-600:#232c38;
+  --n-500:#2f3a48;
+  --n-400:#3c4858;
+
+  --room-deep:var(--n-900);   /* behind everything, html + overscroll */
+  --surf-1:var(--n-700);      /* raised on the room: rows, fields, score cards */
+  --surf-2:var(--n-600);      /* one step up: quiet buttons, sound toggle */
+  --surf-3:var(--n-500);      /* hover / pressed */
+  --line:var(--n-400);        /* hairlines, dividers, button edges */
+  --hud-bg:rgba(10,13,18,.78);
+  /* a scored row is the ramp with gold washed through it, not a brown fill */
+  --surf-hot:color-mix(in srgb, var(--gold) 11%, var(--n-700));
+
+  /* ---- TYPE: one pair for dark surfaces, one for light ---- */
+  --text:#eaeff5;             /* on any --n step: 13:1 or better */
+  --muted:#9dabbb;            /* on any --n step: 6:1 or better  */
+
+  /* ---- SPACING: 4px base. No component sets a raw pixel value. ---- */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px; --s6:24px; --s8:32px;
+
+  /* ---- RADII: three steps and a pill, nothing else ---- */
+  --r-sm:10px; --r-md:14px; --r-lg:18px; --r-pill:999px;
+
+  /* ---- ELEVATION: three soft steps for surfaces, one hard step for the
+     tactile press on buttons. The docket sits above all of them. ---- */
+  --sh-1:0 1px 2px rgba(0,0,0,.45);
+  --sh-2:0 4px 12px rgba(0,0,0,.42);
+  --sh-3:0 10px 26px rgba(0,0,0,.5);
+  --press:0 5px 0 rgba(0,0,0,.45);
+  --press-in:0 2px 0 rgba(0,0,0,.45);
+
+  /* ---- MOTION: everything lands inside 400ms ---- */
+  --dur-1:140ms; --dur-2:220ms; --dur-3:320ms; --dur-4:400ms;
+  --ease:cubic-bezier(.22,1,.36,1);
+
+  /* ---- THE TWO PAPERS ----------------------------------------------------
+     The ticket is warm cream — the one warm object in the room. The picker
+     rows are cool light steel, so the stack reads room / ticket / options. */
+  --ink:#26201a;
+  --ink-soft:#5f5546;         /* body copy on paper, 6.5:1 */
+  --ink-meta:#7d6346;         /* printed meta on paper, 5:1 */
+  --paper-line:rgba(38,32,26,.14);
+  --paper:#f6f1e6;            /* off-white, not cream: less yellow, holds a tint */
+  --paper-edge:#e6dcc7;
+  --steel-paper:#ecf0f5;
+  --steel-paper-hi:#f8fafc;
+  --steel-ink:#171d25;
+  --steel-sub:#4f5a68;
+
+  /* ---- FIRE (reserved) ---------------------------------------------------
+     Heat, gold and ember are for things that are actually hot: the Kitchen
+     Heat gauge, the committing action, a Mark being earned, the burn banner.
+     Nothing decorative may use them. */
+  --heat:#ff6b35;
+  --heat-deep:#e8480f;
+  --ember:#ff9a5c;
+  --gold:#ffc954;
+  --shadow:var(--press);
+
+  /* Two typefaces on a contrast axis: the rounded sans carries the voice
+     (title, scenario lines, chef names), the monospace carries the printed
+     "system" layer (shift, ticket number, station labels) so a docket reads
+     like it came off the rail, not like more UI copy. */
+  --font-docket:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Roboto Mono",monospace;
+
+  /* paper grain, inline so the game stays one offline file */
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  --tile:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='132' height='66'%3E%3Cg stroke='%23ffffff' stroke-opacity='.028' stroke-width='1' fill='none'%3E%3Cpath d='M0 .5h168M0 42.5h168M0 84h168'/%3E%3Cpath d='M84 0v42M0 42v42M168 42v42'/%3E%3C/g%3E%3C/svg%3E");
+  --fibre:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.02 .6' numOctaves='2'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23f)'/%3E%3C/svg%3E");
+
+  /* z-scale: ambient light sits under everything, heat flash over everything */
+  --z-ambient:0; --z-content:1; --z-hud:5; --z-flash:50;
+}
+
+/* Registered so the gradients below interpolate on a shift change instead of
+   snapping. Browsers without @property simply cut to the new shift. */
+@property --room-base{syntax:'<color>';inherits:true;initial-value:#12171d}
+@property --lamp-1{syntax:'<color>';inherits:true;initial-value:rgba(150,190,220,.15)}
+@property --lamp-2{syntax:'<color>';inherits:true;initial-value:rgba(255,190,120,.07)}
+@property --vig{syntax:'<number>';inherits:true;initial-value:.5}
+@property --vig-r{syntax:'<percentage>';inherits:true;initial-value:120%}
+@property --shift-accent{syntax:'<color>';inherits:true;initial-value:#8fb3d0}
+@property --paper-tint{syntax:'<color>';inherits:true;initial-value:rgba(150,190,225,.05)}
+
+/* ---- SHIFT THEMES ------------------------------------------------------
+   One token set per shift, bound to the body class that renderHud already
+   sets. Everything else in the stylesheet reads these; no screen, component
+   or inline style sets a background of its own. */
+body.shift-prep{      /* before service: half the lights on, cold and quiet */
+  --room-base:#121820;
+  --lamp-1:rgba(150,190,225,.13);
+  --lamp-2:rgba(255,200,140,.04);
+  --vig:.44; --vig-r:128%;
+  --shift-accent:#8fb3d0;
+  --paper-tint:rgba(150,190,225,.05);
+}
+body.shift-dinner{    /* service: copper light, the room warms, contrast rises */
+  --room-base:#17130f;
+  --lamp-1:rgba(255,158,70,.26);
+  --lamp-2:rgba(190,80,26,.12);
+  --vig:.64; --vig-r:100%;
+  --shift-accent:#f0a65c;
+  --paper-tint:rgba(255,170,90,.07);
+}
+body.shift-closing{   /* one bulb left over the pass */
+  --room-base:#0c0809;
+  --lamp-1:rgba(235,64,40,.30);
+  --lamp-2:rgba(110,10,6,.22);
+  --vig:.88; --vig-r:70%;
+  --shift-accent:#f07a62;
+  --paper-tint:rgba(240,120,95,.06);
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+html{background:var(--room-deep)}
+/* Screens slide in from +26px, which would briefly widen the document mid-push.
+   `clip` contains that without creating a scroll container — `hidden` here would
+   break the sticky CTA on the picker screen. */
+html,body{overflow-x:clip}
+body{
+  min-height:100dvh;
+  /* The room, bottom to top: tiled wall, the lamp over the pass, a low bounce
+     off the floor. No repeating fabric stripe anywhere. */
+  background:
+    radial-gradient(135% 72% at 50% -14%, var(--lamp-1) 0%, transparent 60%),
+    radial-gradient(90% 42% at 50% 108%, var(--lamp-2) 0%, transparent 72%),
+    var(--tile) 0 0 / 168px 84px,
+    var(--room-base);
+  background-attachment:fixed, fixed, fixed, fixed;
+  transition:--room-base var(--dur-4) ease-out, --lamp-1 var(--dur-4) ease-out,
+             --lamp-2 var(--dur-4) ease-out, --vig var(--dur-4) ease-out,
+             --vig-r var(--dur-4) ease-out, --shift-accent var(--dur-4) ease-out,
+             --paper-tint var(--dur-4) ease-out;
+  color:var(--text);
+  font-family:"Avenir Next","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  font-size:18px;
+  line-height:1.35;
+  overscroll-behavior:none;
+}
+
+.wrap{
+  max-width:600px;margin:0 auto;padding:var(--s4) var(--s4) var(--s8);
+  display:flex;flex-direction:column;min-height:100dvh;
+  position:relative;z-index:var(--z-content);
+}
+
+/* ---------- ambient service lighting ----------
+   Two layers only; the colour comes from the shift tokens above, so this
+   markup never changes between shifts. */
+#ambient{position:fixed;inset:0;z-index:var(--z-ambient);pointer-events:none}
+.amb-steel{position:absolute;inset:0;opacity:.035;mix-blend-mode:overlay;
+  background-image:var(--fibre);background-size:340px 340px}
+/* fine grain over the whole room so the gradients never band */
+#ambient::after{content:'';position:absolute;inset:0;opacity:.035;
+  background-image:var(--grain);background-size:200px 200px}
+.amb-vignette{position:absolute;inset:0;opacity:var(--vig);
+  transition:opacity var(--dur-4) ease-out;
+  background:radial-gradient(var(--vig-r) var(--vig-r) at 50% 32%, transparent 18%, rgba(0,0,0,.94) 100%)}
+
+/* the lights change: one wash across the room when the shift turns over */
+#shiftWash{position:fixed;inset:0;z-index:var(--z-flash);pointer-events:none;opacity:0;
+  background:radial-gradient(64% 42% at 50% 0%, var(--shift-accent), transparent 70%)}
+#shiftWash.on{animation:lightsChange 520ms ease-out}
+@keyframes lightsChange{0%{opacity:0}22%{opacity:.7}100%{opacity:0}}
+.shift-turn{animation:shiftTag 600ms ease-out}
+@keyframes shiftTag{0%,100%{transform:none}20%{transform:scale(1.14)}45%{transform:scale(.99)}}
+
+/* heat flash: the room goes red for a beat when a ticket dies */
+/* the glow stays at the edges: the ticket and the calls must stay readable
+   while the room reacts */
+#heatFlash{position:fixed;inset:0;z-index:var(--z-flash);pointer-events:none;opacity:0;
+  box-shadow:inset 0 0 70px 10px rgba(255,74,26,1), inset 0 0 160px 40px rgba(180,16,0,.55)}
+#heatFlash.fire{animation:edgeFlash 700ms ease-out}
+@keyframes edgeFlash{0%{opacity:0}12%{opacity:1}45%{opacity:.5}65%{opacity:.8}100%{opacity:0}}
+.shake{animation:shake 380ms cubic-bezier(.36,.07,.19,.97)}
+@keyframes shake{
+  10%{transform:translate(-5px,2px) rotate(-.4deg)} 22%{transform:translate(6px,-2px) rotate(.45deg)}
+  36%{transform:translate(-6px,1px) rotate(-.45deg)} 50%{transform:translate(5px,2px) rotate(.3deg)}
+  66%{transform:translate(-4px,-1px) rotate(-.2deg)} 82%{transform:translate(2px,1px)}
+  100%{transform:none}}
+/* the room closes in for a beat on a miss, in sync with the shake */
+.amb-vignette.surge{animation:vigSurge 620ms var(--ease)}
+@keyframes vigSurge{0%{opacity:var(--vig)}22%{opacity:calc(var(--vig) + .3)}100%{opacity:var(--vig)}}
+
+/* ---------- shared bits ---------- */
+h1,h2,h3{margin:0;letter-spacing:.01em}
+.screen{display:none;flex:1;flex-direction:column}
+/* Screens push: forward slides in from the right while the old one leaves to
+   the left; going back reverses it. The leaving screen is pinned in place so the
+   layout never jumps mid-transition. Enter = ease-out, leave = ease-in. */
+.screen.active{display:flex}
+.screen.in-fwd{animation:inFromRight var(--dur-2) var(--ease)}
+.screen.in-back{animation:inFromLeft var(--dur-2) var(--ease)}
+.screen.leaving{display:flex !important;position:absolute;pointer-events:none;z-index:3;overflow:hidden}
+.screen.leaving.out-fwd{animation:outToLeft 160ms cubic-bezier(.4,0,1,1) forwards}
+.screen.leaving.out-back{animation:outToRight 160ms cubic-bezier(.4,0,1,1) forwards}
+@keyframes inFromRight{from{opacity:0;transform:translate3d(26px,0,0)}to{opacity:1;transform:none}}
+@keyframes inFromLeft{from{opacity:0;transform:translate3d(-26px,0,0)}to{opacity:1;transform:none}}
+@keyframes outToLeft{from{opacity:1;transform:none}to{opacity:0;transform:translate3d(-22px,0,0)}}
+@keyframes outToRight{from{opacity:1;transform:none}to{opacity:0;transform:translate3d(22px,0,0)}}
+
+/* the head-chef line lands just before the ticket does */
+.stagger > *{animation:riseIn var(--dur-2) var(--ease) backwards}
+.stagger > *:nth-child(1){animation-delay:40ms}
+.stagger > *:nth-child(2){animation-delay:100ms}
+.stagger > *:nth-child(3){animation-delay:170ms}
+@keyframes riseIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* the pulled ticket lands on the pass: up, settling out of a wider tilt */
+@keyframes docketIn{
+  from{opacity:0;transform:translateY(34px) rotate(calc(var(--tilt,0deg) * 2.4)) scale(.94)}
+  60%{opacity:1}
+  to{opacity:1;transform:rotate(var(--tilt,0deg))}}
+.docket{animation:docketIn var(--dur-3) var(--ease)}
+.docket.slim{animation-duration:var(--dur-2)}
+
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+
+/* Three button jobs, three treatments:
+   .btn        quiet — hand-offs and continues (pass the device, next ticket)
+   .btn.hot    the committing action on the screen (start, call it, lock it in)
+   .btn.gold   the reward beat (flip the ticket, run it back)             */
+.btn{
+  display:block;width:100%;padding:var(--s4) var(--s5);border-radius:var(--r-lg);
+  background:var(--surf-2);color:var(--text);border:1px solid var(--line);
+  font-weight:800;font-size:1.08rem;letter-spacing:.02em;box-shadow:var(--shadow);
+  transition:transform var(--dur-1) var(--ease), box-shadow var(--dur-1) ease-out,
+             filter var(--dur-1) ease-out;
+}
+.btn:active{transform:translateY(3px) scale(.97);box-shadow:var(--press-in)}
+/* springs back on release rather than easing flatly out of the press */
+.btn,.station,.count,.facedown,.soundbtn,.helpbtn{
+  transition:transform 190ms cubic-bezier(.34,1.5,.64,1), box-shadow var(--dur-1) ease-out,
+             background var(--dur-1) ease-out, filter var(--dur-1) ease-out,
+             border-color var(--dur-1) ease-out}
+/* a primary action announces itself the moment it becomes usable */
+.btn.hot:not([disabled]){animation:ctaBreathe 2.8s ease-in-out infinite}
+.btn.hot.armed{animation:ctaArm 460ms var(--ease), ctaBreathe 2.8s ease-in-out 460ms infinite}
+@keyframes ctaArm{
+  0%{transform:scale(.97);box-shadow:0 5px 0 #8d2c06, 0 0 0 rgba(255,107,53,0);filter:brightness(.9)}
+  45%{transform:scale(1.035);box-shadow:0 5px 0 #8d2c06, 0 0 34px rgba(255,150,80,.75);filter:brightness(1.15)}
+  100%{transform:none;box-shadow:0 5px 0 #8d2c06, 0 0 18px rgba(255,107,53,.28);filter:none}}
+@keyframes ctaBreathe{
+  0%,100%{box-shadow:0 5px 0 #8d2c06, 0 0 16px rgba(255,107,53,.24)}
+  50%{box-shadow:0 5px 0 #8d2c06, 0 0 26px rgba(255,107,53,.42)}}
+@media (hover:hover){
+  .btn:hover{transform:translateY(-2px);box-shadow:0 8px 0 rgba(0,0,0,.45);
+    filter:brightness(1.06)}
+  .btn.hot:hover{box-shadow:0 8px 0 #8d2c06, 0 0 26px rgba(255,107,53,.4)}
+  .btn.gold:hover{box-shadow:0 8px 0 #a8761b, 0 0 26px rgba(255,201,84,.34)}
+  .station:hover{transform:translateY(-2px);box-shadow:var(--sh-3), 0 1px 0 rgba(255,255,255,.75) inset}
+  .count:hover{background:var(--surf-3)}
+  .soundbtn:hover{background:var(--surf-3);color:var(--text)}
+  .facedown:hover{transform:translateY(-2px);box-shadow:var(--sh-3)}
+}
+.btn.hot{
+  background:linear-gradient(180deg, #ff8347 0%, var(--heat) 42%, var(--heat-deep) 100%);
+  color:#2a0f04;border-color:var(--ember);font-size:1.2rem;font-weight:900;padding:var(--s5);
+  box-shadow:0 5px 0 #8d2c06, 0 0 18px rgba(255,107,53,.28);
+  text-shadow:0 1px 0 rgba(255,255,255,.25);
+}
+.btn.hot:active{transform:translateY(3px) scale(.99);box-shadow:0 2px 0 #8d2c06, 0 0 12px rgba(255,107,53,.25)}
+.btn.gold{
+  background:linear-gradient(180deg,#ffdc8a,var(--gold));color:#3a2205;border-color:#ffe9b0;
+  box-shadow:0 5px 0 #a8761b, 0 0 18px rgba(255,201,84,.24)}
+.btn.gold:active{box-shadow:0 2px 0 #a8761b}
+.btn.ghost{background:transparent;color:var(--muted)}
+.btn-ico{width:23px;height:23px;display:inline-grid;place-items:center;vertical-align:-5px;color:#3a2205}
+.btn[disabled]{filter:grayscale(.6) brightness(.7);cursor:default;transform:none}
+
+.stack{display:flex;flex-direction:column;gap:var(--s3)}
+.center{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;flex:1;gap:var(--s5)}
+.muted{color:var(--muted);font-size:.92rem}
+.eyebrow{
+  font-family:var(--font-docket);
+  text-transform:uppercase;letter-spacing:.16em;font-size:.72rem;font-weight:700;color:var(--shift-accent);
+}
+
+/* ---------- HUD (kitchen heat is always on screen during play) ---------- */
+#hud{display:none;gap:var(--s3);align-items:center;justify-content:space-between;
+  background:var(--hud-bg);border:1px solid var(--line);border-radius:var(--r-md);
+  padding:var(--s3);margin-bottom:var(--s4);backdrop-filter:blur(4px);box-shadow:var(--sh-1)}
+#hud.on{display:flex}
+.hud-left{display:flex;flex-direction:column;gap:var(--s1);min-width:0}
+#hudProgress{font-family:var(--font-docket);font-size:.74rem;letter-spacing:.06em;white-space:nowrap}
+
+}
+.shift-tag{font-family:var(--font-docket);font-weight:700;font-size:.86rem;letter-spacing:.04em;white-space:nowrap;
+  color:var(--shift-accent);transition:color .6s ease-out}
+.shift-tag::before{content:"";display:inline-block;width:9px;height:9px;border-radius:var(--r-pill);margin-right:var(--s2);background:var(--gold);vertical-align:middle}
+.shift-dinner .shift-tag::before{background:#e8712f}
+.shift-closing .shift-tag::before{background:#b3271f}
+.hud-right{text-align:right;flex:none}
+.heat-label{font-family:var(--font-docket);font-size:.64rem;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--muted);font-weight:700}
+.pips{display:flex;gap:var(--s1);margin-top:var(--s1);justify-content:flex-end;align-items:flex-end;
+  padding:var(--s1) var(--s2);border-radius:var(--r-sm);background:linear-gradient(180deg,var(--n-900),var(--n-700));
+  border:1px solid var(--line);box-shadow:inset 0 2px 6px rgba(0,0,0,.8);position:relative;overflow:hidden}
+/* the gauge fills with fire behind the flames as the night goes wrong */
+.pips::before{content:'';position:absolute;left:0;bottom:0;top:0;width:var(--fill,0%);
+  background:linear-gradient(90deg, rgba(255,60,0,.15), rgba(255,110,40,.5));
+  transition:width var(--dur-4) var(--ease)}
+.flame{width:21px;height:26px;color:#6e7b8a;transform-origin:50% 100%;position:relative;
+  transition:color .4s ease-out;animation:ember 4.6s ease-in-out infinite}
+.flame svg{width:100%;height:100%;display:block;fill:currentColor}
+/* an unlit slot is an empty outline, a lit one is solid and burning */
+.flame:not(.lit) svg{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linejoin:round}
+.flame.lit{color:var(--heat);animation:flicker 2.3s ease-in-out infinite}
+.flame.ignite{animation:ignite .72s cubic-bezier(.16,1,.3,1) 1, flicker 2.3s ease-in-out .72s infinite}
+/* unlit flames breathe faintly, lit ones flicker — the track is never just a stat */
+@keyframes ember{0%,100%{opacity:.6}50%{opacity:.85}}
+/* the gauge itself breathes, harder as the night goes wrong */
+.pips{animation:gaugeIdle 5.2s ease-in-out infinite}
+@keyframes gaugeIdle{0%,100%{box-shadow:inset 0 2px 6px rgba(0,0,0,.8)}
+  50%{box-shadow:inset 0 2px 6px rgba(0,0,0,.8), 0 0 8px rgba(255,107,53,.12)}}
+.heat-cluster.hot .pips{animation:gaugeHot 1.6s ease-in-out infinite}
+@keyframes gaugeHot{0%,100%{box-shadow:inset 0 2px 6px rgba(0,0,0,.8), 0 0 10px rgba(255,80,30,.35)}
+  50%{box-shadow:inset 0 2px 6px rgba(0,0,0,.8), 0 0 22px rgba(255,110,50,.7)}}
+.heat-cluster.hot .flame.lit{animation-duration:1.15s}
+/* the ticket is never a frozen frame while it's being read out */
+.docket:not(.slim):not(.tut-slide) .ticket{animation:paperIdle 7.5s ease-in-out 600ms infinite}
+@keyframes paperIdle{
+  0%,100%{transform:translateY(0) rotate(0)}
+  33%{transform:translateY(-1.5px) rotate(.22deg)}
+  66%{transform:translateY(1px) rotate(-.18deg)}}
+@keyframes flicker{
+  0%,100%{transform:scaleY(1);filter:drop-shadow(0 0 5px rgba(255,107,53,.75))}
+  42%{transform:scaleY(1.1) translateY(-1px);filter:drop-shadow(0 0 11px rgba(255,150,60,.95))}
+  68%{transform:scaleY(.96);filter:drop-shadow(0 0 6px rgba(255,107,53,.8))}}
+@keyframes ignite{
+  0%{transform:scale(.4) translateY(8px);filter:drop-shadow(0 0 0 rgba(255,107,53,0)) brightness(2.4)}
+  26%{transform:scale(2.1);filter:drop-shadow(0 0 26px rgba(255,214,120,1)) brightness(2.2)}
+  46%{transform:scale(1.15) translateY(-2px);filter:drop-shadow(0 0 16px rgba(255,150,60,.95))}
+  70%{transform:scale(.92)}
+  100%{transform:scale(1);filter:drop-shadow(0 0 6px rgba(255,107,53,.8))}}
+.heat-cluster{display:flex;flex-direction:column;align-items:flex-end}
+.heat-cluster.hot .heat-label{color:#ff8a4c;animation:labelPulse 1.7s ease-in-out infinite}
+@keyframes labelPulse{0%,100%{opacity:.75}50%{opacity:1;text-shadow:0 0 10px rgba(255,107,53,.8)}}
+
+/* ---------- sound toggle ---------- */
+.soundbtn{width:34px;height:34px;flex:none;border-radius:var(--r-sm);background:var(--surf-2);
+  color:var(--muted);border:1px solid var(--line);
+  display:grid;place-items:center;box-shadow:var(--sh-1);
+  transition:transform var(--dur-1) var(--ease), color var(--dur-2) ease-out, background var(--dur-1) ease-out}
+.soundbtn:active{transform:scale(.94)}
+.soundbtn svg{width:19px;height:19px;fill:currentColor}
+.soundbtn[aria-pressed="false"]{color:#67727f}
+
+/* ---------- title ---------- */
+.title{font-size:clamp(2.6rem,13vw,4rem);font-weight:900;line-height:.92;color:var(--text);
+  text-shadow:0 4px 0 #8a3417, 0 8px 22px rgba(0,0,0,.5)}
+.title em{font-style:normal;color:var(--heat);display:block}
+.sub{color:var(--muted)}
+
+/* ---------- how to play ---------- */
+.tut{display:flex;flex-direction:column;gap:var(--s4);flex:1}
+.tut-head{display:flex;align-items:center;justify-content:space-between;gap:var(--s3)}
+.dots{display:flex;gap:var(--s2)}
+.dot{width:8px;height:8px;border-radius:var(--r-pill);background:var(--line);
+  transition:background var(--dur-2) ease-out, transform var(--dur-2) var(--ease)}
+.dot.on{background:var(--shift-accent);transform:scale(1.3)}
+.tut-skip{font-family:var(--font-docket);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--muted);padding:var(--s2);border-radius:var(--r-sm);
+  transition:color var(--dur-1) ease-out, background var(--dur-1) ease-out}
+/* the tutorial cards are dockets too — same torn rail, grain and tilt, so the
+   first thing a new player sees is the object the whole game is made of */
+.docket.tut-slide{animation:tutSlide var(--dur-3) var(--ease)}
+@keyframes tutSlide{
+  from{opacity:0;transform:translate3d(30px,0,0) rotate(var(--tilt,0deg)) scale(.97)}
+  to{opacity:1;transform:rotate(var(--tilt,0deg))}}
+.tut-ticket{padding:var(--s6) var(--s5) var(--s5);
+  display:flex;flex-direction:column;gap:var(--s3)}
+.tut-ticket h2{font-size:1.4rem;line-height:1.14;color:var(--ink);text-wrap:balance}
+.tut-ticket p{margin:0;color:var(--ink-soft);line-height:1.45;font-size:.97rem}
+.tut-ticket p b,.tut-ticket span b{color:var(--ink);font-weight:800}
+.tut-legend{display:flex;flex-direction:column;gap:var(--s2)}
+.tut-station{display:flex;align-items:center;gap:var(--s3);background:rgba(38,32,26,.045);
+  border:1px solid var(--paper-line);border-radius:var(--r-md);padding:var(--s2) var(--s3)}
+.tut-station .ico{width:28px;height:28px;flex:none;color:var(--c);
+  filter:drop-shadow(0 1px 1px rgba(38,32,26,.25))}
+.tut-station b{font-size:1rem;font-weight:800;color:var(--ink)}
+.tut-station span{display:block;color:var(--ink-soft);font-size:.84rem}
+.tut-steps{display:flex;flex-direction:column;gap:var(--s3)}
+.tut-step{display:flex;gap:var(--s3);align-items:flex-start}
+.tut-step i{font-family:var(--font-docket);font-style:normal;font-weight:700;font-size:.76rem;
+  color:var(--ink-meta);padding-top:4px;min-width:18px;letter-spacing:.04em}
+.tut-step span{color:var(--ink-soft);line-height:1.45;font-size:.95rem}
+.tut-demo{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;
+  background:rgba(38,32,26,.045);border:1px solid var(--paper-line);
+  border-radius:var(--r-md);padding:var(--s3)}
+.tut-demo .cap{color:var(--ink-soft);font-size:.87rem;line-height:1.4;flex:1;min-width:140px}
+.tut-demo .cap b{color:var(--ink);font-weight:800}
+/* short phones: the densest card still has to fit above the CTA */
+@media (max-height:720px){
+  .tut-ticket{padding:var(--s5) var(--s4) var(--s4);gap:var(--s2)}
+  .tut-ticket h2{font-size:1.22rem}
+  .tut-ticket p,.tut-step span,.tut-demo .cap{font-size:.88rem;line-height:1.38}
+  .tut-station{padding:var(--s1) var(--s3)}
+  .tut-station .ico{width:24px;height:24px}
+  .tut-demo{padding:var(--s2)}
+  .tut .foot{padding-top:var(--s3)}
+}
+/* a Mark reads as a token resting on paper, not a chip on a dark row */
+.tut-ticket .mark-token{background:rgba(255,255,255,.7);
+  box-shadow:inset 0 1px 3px rgba(38,32,26,.14), 0 1px 0 rgba(38,32,26,.18)}
+.tut-ticket .mark-token::after{display:none}
+.tut-marks{display:flex;gap:var(--s1)}
+.helpbtn{align-self:flex-end;width:36px;height:36px;flex:none;border-radius:var(--r-pill);
+  background:var(--surf-2);border:1px solid var(--line);color:var(--muted);
+  font-weight:900;font-size:1.05rem;display:grid;place-items:center;box-shadow:var(--sh-1);
+  transition:transform var(--dur-1) var(--ease), color var(--dur-1) ease-out, background var(--dur-1) ease-out}
+.helpbtn:active{transform:scale(.94)}
+@media (hover:hover){
+  .helpbtn:hover{background:var(--surf-3);color:var(--text)}
+  .tut-skip:hover{color:var(--text);background:var(--surf-2)}
+}
+
+/* ---------- title screen ----------
+   Ambient motion behind the wordmark is built from the idle utilities the heat
+   gauge already uses: `ember` (the slow opacity breath on an unlit flame) and
+   `flicker` (the lit-flame pulse + glow). `paperIdle` supplies the slow drift on
+   the wisp. The one addition is `emberDrift` — nothing in the existing set
+   travels far enough for a mote to cross the screen. */
+.title-ambient{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+.title-stage,#s-title .foot{position:relative;z-index:1}
+.title-glow{position:absolute;left:50%;top:34%;width:min(150%,560px);aspect-ratio:1;
+  transform:translate(-50%,-50%);border-radius:50%;
+  background:radial-gradient(circle, rgba(255,120,48,.34) 0%, rgba(255,90,30,.13) 38%, transparent 68%);
+  animation:ember 4.6s ease-in-out infinite}
+.title-wisp{position:absolute;left:50%;top:22%;width:min(120%,420px);height:46%;
+  transform:translateX(-50%);
+  background:radial-gradient(60% 50% at 50% 100%, rgba(255,190,140,.14), transparent 72%);
+  filter:blur(6px);animation:paperIdle 7.5s ease-in-out infinite}
+.mote{position:absolute;bottom:-14px;width:8px;height:10px;
+  animation:emberDrift 11s ease-in-out infinite}
+.mote b{display:block;width:100%;height:100%;border-radius:50%;
+  background:radial-gradient(circle, #ffd9a8 0%, var(--ember) 42%, rgba(255,90,30,.5) 68%, transparent 80%);
+  filter:drop-shadow(0 0 6px rgba(255,140,60,.9));
+  animation:flicker 2.3s ease-in-out infinite}
+.mote.m1{left:14%}
+.mote.m2{left:29%;animation-delay:-2.6s;width:6px;height:8px}
+.mote.m3{left:47%;animation-delay:-5.2s}
+.mote.m4{left:63%;animation-delay:-7.4s;width:10px;height:12px}
+.mote.m5{left:78%;animation-delay:-3.8s;width:6px;height:7px}
+.mote.m6{left:90%;animation-delay:-9.1s}
+.mote.m2 b{animation-delay:-1.1s}.mote.m3 b{animation-delay:-1.8s}
+.mote.m4 b{animation-delay:-.9s}.mote.m5 b{animation-delay:-1.5s}.mote.m6 b{animation-delay:-2s}
+/* the only new keyframe: a mote rising the height of the screen */
+@keyframes emberDrift{
+  0%{transform:translate3d(0,0,0) scale(.7);opacity:0}
+  12%{opacity:1}
+  50%{transform:translate3d(14px,-46vh,0) scale(1)}
+  78%{opacity:.65}
+  100%{transform:translate3d(-10px,-88vh,0) scale(.6);opacity:0}}
+#s-title .eyebrow{animation:labelPulse 3.4s ease-in-out infinite}
+.btn-link{display:block;width:100%;padding:var(--s3);border-radius:var(--r-md);
+  background:none;color:var(--muted);font-family:var(--font-docket);font-size:.78rem;
+  letter-spacing:.14em;text-transform:uppercase;font-weight:700;
+  transition:color var(--dur-1) ease-out, background var(--dur-1) ease-out}
+.btn-link:active{transform:scale(.97);color:var(--text)}
+@media (hover:hover){.btn-link:hover{color:var(--text);background:var(--surf-1)}}
+
+/* the setup screen now opens straight on the player count, and that question is
+   the screen's headline rather than a small label */
+.setup-stack{margin-top:auto;margin-bottom:auto}
+.setup-title{font-size:clamp(2.1rem,10.5vw,3rem);font-weight:900;line-height:1.04;
+  letter-spacing:-.01em;color:var(--text);text-wrap:balance;margin-bottom:var(--s4)}
+
+/* ---------- start screen ---------- */
+.count-row{display:flex;gap:var(--s3);justify-content:center}
+.count{flex:1;padding:var(--s4) 0;border-radius:var(--r-md);background:var(--surf-2);
+  font-weight:900;font-size:1.4rem;border:2px solid var(--line);box-shadow:var(--sh-1);
+  transition:background var(--dur-1) ease-out, border-color var(--dur-1) ease-out,
+             transform var(--dur-1) var(--ease)}
+.count.sel{background:var(--steel-paper);color:var(--steel-ink);border-color:var(--gold)}
+.names{display:flex;flex-direction:column;gap:var(--s2)}
+.name-row{display:flex;align-items:center;gap:var(--s3);background:var(--surf-1);
+  padding:var(--s2) var(--s3);border:1px solid var(--line);border-radius:var(--r-md);
+  transition:border-color var(--dur-1) ease-out}
+.name-row:focus-within{border-color:var(--shift-accent)}
+.name-row span{font-size:1.3rem}
+.name-row input{
+  flex:1;background:transparent;border:0;border-bottom:2px dashed var(--line);color:var(--text);
+  font:inherit;font-weight:700;padding:var(--s1) 2px;min-width:0;
+}
+.name-row input:focus{outline:none;border-bottom-color:var(--gold)}
+
+/* ---------- ticket card: torn off the thermal rail ---------- */
+.docket{
+  width:100%;position:relative;
+  transform:rotate(var(--tilt,0deg));
+  filter:drop-shadow(0 14px 18px rgba(0,0,0,.5)) drop-shadow(0 3px 2px rgba(0,0,0,.3));
+}
+.ticket{
+  background:var(--paper);color:var(--ink);padding:var(--s8) var(--s6) var(--s6);
+  border-top:14px solid var(--gold);
+  width:100%;position:relative;
+  clip-path:polygon(
+    0.000% 16px,
+    5.263% 0px,
+    10.526% 14px,
+    15.789% 0px,
+    21.053% 12px,
+    26.316% 0px,
+    31.579% 11px,
+    36.842% 0px,
+    42.105% 11px,
+    47.368% 0px,
+    52.632% 11px,
+    57.895% 0px,
+    63.158% 16px,
+    68.421% 0px,
+    73.684% 11px,
+    78.947% 0px,
+    84.211% 14px,
+    89.474% 0px,
+    94.737% 11px,
+    100.000% 0px,
+    100.000% 100%,
+    94.737% calc(100% - 13px),
+    89.474% 100%,
+    84.211% calc(100% - 10px),
+    78.947% 100%,
+    73.684% calc(100% - 10px),
+    68.421% 100%,
+    63.158% calc(100% - 13px),
+    57.895% 100%,
+    52.632% calc(100% - 15px),
+    47.368% 100%,
+    42.105% calc(100% - 10px),
+    36.842% 100%,
+    31.579% calc(100% - 15px),
+    26.316% 100%,
+    21.053% calc(100% - 10px),
+    15.789% 100%,
+    10.526% calc(100% - 15px),
+    5.263% 100%,
+    0.000% calc(100% - 10px)
+  );
+  background-image:
+    repeating-linear-gradient(0deg, rgba(38,32,26,.06) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, var(--paper-tint), var(--paper-tint)),
+    linear-gradient(175deg, #fdfaf3 0%, var(--paper) 42%, var(--paper-edge) 100%);
+}
+.ticket > *{position:relative;z-index:1}
+.ticket::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;
+  background-image:var(--grain);background-size:160px 160px;opacity:.34;mix-blend-mode:multiply}
+/* second, coarser layer: paper fibre pulling across the print */
+.ticket::after{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;
+  background-image:var(--fibre);background-size:220px 220px;opacity:.16;mix-blend-mode:multiply;
+  filter:contrast(1.4)}
+.shift-dinner .ticket{border-top-color:#e8712f}
+.shift-closing .ticket{border-top-color:#b3271f}
+.ticket .emoji{font-size:clamp(3.4rem,18vw,5rem);line-height:1;display:block;margin-bottom:10px}
+.ticket .line{font-size:clamp(1.5rem,7vw,2.1rem);font-weight:800;line-height:1.18;text-wrap:balance}
+.ticket .stub{margin-top:16px;border-top:2px dashed #c7b08a;padding-top:10px;
+  font-family:var(--font-docket);font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;
+  color:#7d6346;font-weight:700}
+/* the compact docket that heads the call + reveal screens */
+.ticket.slim{padding:var(--s5) var(--s4) var(--s3);border-top-width:8px}
+.docket.slim{--tilt:-1.2deg}
+
+.facedown{
+  width:100%;background:
+    repeating-linear-gradient(135deg,#b3452f 0 14px,#a63e29 14px 28px);
+  border-radius:var(--r-lg);padding:var(--s8) var(--s5);text-align:center;font-weight:900;
+  font-size:1.3rem;color:#ffe5cd;border:3px solid #7d2c1c;box-shadow:var(--sh-2);
+  transition:transform var(--dur-1) var(--ease), box-shadow var(--dur-1) ease-out;
+}
+.facedown:active{transform:translateY(3px) scale(.99);box-shadow:var(--sh-1)}
+.facedown small{display:block;font-weight:700;font-size:.85rem;color:#ffd0b2;margin-top:8px;letter-spacing:.05em}
+
+/* ---------- station silhouettes ----------
+   Each station is a distinct outline (flame / knife / pan / leaf / bell) so the
+   five are separable by shape alone — color is the second signal, not the only
+   one, which is what a colorblind player at the table needs. Same shape is used
+   in the picker, the reveal list, the answer, the mark tally and the badges. */
+.ico svg{width:100%;height:100%;display:block;fill:currentColor}
+.ico svg .hl{fill:rgba(255,255,255,.34)}
+.station .ico{filter:drop-shadow(0 2px 3px rgba(43,28,22,.28))}
+
+/* ---------- station buttons ---------- */
+.stations{display:flex;flex-direction:column;gap:var(--s2)}
+.station{
+  display:flex;align-items:center;gap:var(--s4);width:100%;text-align:left;
+  background:linear-gradient(180deg,#f7f9fb,var(--steel-paper));color:var(--steel-ink);
+  border-radius:var(--r-lg);padding:var(--s2) var(--s4);border:2px solid transparent;
+  box-shadow:var(--sh-2), 0 1px 0 rgba(255,255,255,.75) inset;
+  transition:transform var(--dur-1) var(--ease), box-shadow var(--dur-1) ease-out,
+             border-color var(--dur-1) ease-out;
+}
+.station:active{transform:translateY(1px) scale(.965);box-shadow:var(--sh-1);
+  background:linear-gradient(180deg, var(--steel-paper), #e4e9f0)}
+.station.sel{animation:stationPick 320ms var(--ease)}
+@keyframes stationPick{
+  0%{transform:scale(.965)}
+  40%{transform:scale(1.025)}
+  70%{transform:scale(.995)}
+  100%{transform:none}}
+.station .nm::after{display:inline-block;animation:checkPop 260ms var(--ease) backwards}
+@keyframes checkPop{from{opacity:0;transform:scale(.4) rotate(-20deg)}to{opacity:1;transform:none}}
+.station .ico{width:40px;height:40px;display:grid;place-items:center;flex:none;color:var(--c)}
+.station .nm{font-weight:900;font-size:1.1rem;line-height:1.15}
+.station .job{font-size:.84rem;line-height:1.3;color:var(--steel-sub);font-weight:600}
+.station.sel{border-color:var(--c);background:var(--steel-paper-hi);
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--c) 45%, transparent),
+             0 0 22px color-mix(in srgb, var(--c) 30%, transparent), var(--sh-2)}
+.station.sel .nm::after{content:" ✓";color:var(--c)}
+
+/* ---------- reveal: the calls flip onto the pass one at a time ---------- */
+.picks{perspective:900px}
+.pick.dealing{animation:flipDown 260ms var(--ease) backwards;transform-origin:50% 0%}
+@keyframes flipDown{
+  from{opacity:0;transform:rotateX(-82deg) translateY(-8px)}
+  60%{opacity:1}
+  to{opacity:1;transform:none}}
+.revealing{font-family:var(--font-docket);font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--shift-accent);animation:revealingPulse 700ms ease-in-out infinite}
+@keyframes revealingPulse{0%,100%{opacity:.45}50%{opacity:1}}
+
+/* ---------- win: confetti + the stats landing one at a time ---------- */
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:var(--z-flash);overflow:hidden}
+#confetti i{position:absolute;top:-18px;width:8px;height:13px;border-radius:2px;opacity:.95;
+  animation:fall cubic-bezier(.4,.05,.8,.6) forwards}
+@keyframes fall{
+  0%{transform:translateY(-20px) rotate(0)}
+  100%{transform:translateY(102vh) rotate(var(--rot,360deg))}}
+.score{animation:scoreIn var(--dur-3) var(--ease) var(--d,0ms) backwards}
+@keyframes scoreIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+#s-end .center > *{animation:riseIn var(--dur-2) var(--ease) backwards}
+#s-end .center > *:nth-child(1){animation-delay:60ms}
+#s-end .center > *:nth-child(2){animation-delay:140ms}
+#s-end .center > *:nth-child(3){animation-delay:220ms}
+
+/* ---------- loss: one hard hit, then the room goes quiet ---------- */
+.bust-hit{animation:bustHit 520ms cubic-bezier(.36,.07,.19,.97)}
+@keyframes bustHit{
+  0%{transform:scale(1.03)}
+  12%{transform:translate(-6px,3px) scale(1.02)}
+  26%{transform:translate(6px,-2px)}
+  42%{transform:translate(-5px,1px)}
+  60%{transform:translate(3px,0)}
+  100%{transform:none}}
+#s-bust .center > *{animation:riseIn var(--dur-3) var(--ease) backwards}
+#s-bust .center > *:nth-child(1){animation-delay:340ms}
+#s-bust .center > *:nth-child(2){animation-delay:430ms}
+#s-bust .center > *:nth-child(3){animation-delay:520ms}
+#s-bust .center > *:nth-child(4){animation-delay:600ms}
+#s-bust .center > *:nth-child(5){animation-delay:680ms}
+
+/* ---------- reveal ---------- */
+.picks{display:flex;flex-direction:column;gap:var(--s2)}
+.pick{display:flex;align-items:center;gap:var(--s3);background:var(--surf-1);border-radius:var(--r-md);padding:var(--s3);
+  border:2px solid var(--line);
+  transition:background var(--dur-2) ease-out, border-color var(--dur-2) ease-out,
+             opacity var(--dur-2) ease-out, box-shadow var(--dur-2) ease-out}
+.pick .ico{width:36px;height:36px;display:grid;place-items:center;flex:none;color:var(--c)}
+.pick .who{font-weight:800;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  display:flex;align-items:center;gap:var(--s2)}
+.pick .who b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hc{width:17px;height:17px;flex:none;color:var(--muted);opacity:.9}
+.hc svg{width:100%;height:100%;fill:currentColor;display:block}
+.pick .what{font-weight:700;color:var(--muted);font-size:.88rem;white-space:nowrap}
+.pick.hit{border-color:var(--gold);background:var(--surf-hot);
+  box-shadow:0 0 18px rgba(255,201,84,.22)}
+.pick.miss{opacity:.45}
+/* a Mark is a token that drops onto the pass, not a "+1" appearing */
+.mark-token{width:30px;height:30px;flex:none;border-radius:50%;display:grid;place-items:center;position:relative;
+  color:var(--c);background:rgba(255,255,255,.08);border:2px solid var(--c);
+  box-shadow:0 2px 0 rgba(0,0,0,.35), inset 0 2px 6px rgba(255,255,255,.14);
+  opacity:0;animation:markDrop var(--dur-4) var(--ease) var(--d,0ms) forwards}
+.mark-token .ico{width:15px;height:15px}
+@keyframes markDrop{
+  0%{opacity:0;transform:translateY(-38px) scale(.6) rotate(-18deg)}
+  46%{opacity:1;transform:translateY(4px) scale(1.18) rotate(3deg)}
+  66%{transform:translateY(-7px) scale(.97)}
+  84%{transform:translateY(1px) scale(1.04)}
+  100%{opacity:1;transform:none}}
+/* the impact ring the token leaves when it lands */
+.mark-token::after{content:'';position:absolute;inset:-6px;border-radius:50%;
+  border:2px solid var(--c);opacity:0;animation:markRing .6s ease-out calc(var(--d,0ms) + 210ms) forwards}
+@keyframes markRing{0%{opacity:.85;transform:scale(.6)}100%{opacity:0;transform:scale(1.5)}}
+
+.answer{background:var(--paper);color:var(--ink);border-radius:var(--r-lg);
+  padding:var(--s5) var(--s4);text-align:center;
+  box-shadow:var(--sh-2);border:2px solid var(--c);
+  background-image:linear-gradient(180deg, color-mix(in srgb, var(--c) 14%, transparent), transparent 70%)}
+.answer .job{font-size:.95rem;line-height:1.35;color:var(--ink-soft);font-weight:600;margin-top:2px}
+.answer .big{font-size:1.7rem;font-weight:900;margin-top:4px;
+  display:flex;align-items:center;justify-content:center;gap:var(--s3)}
+.answer .ico{width:38px;height:38px;flex:none;color:var(--c)}
+.answer .lbl{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:#9a7f61;font-weight:800}
+
+.burn{background:color-mix(in srgb, var(--heat) 18%, var(--n-800));border:2px solid var(--heat);
+  border-radius:var(--r-lg);padding:var(--s4);text-align:center;font-weight:800;box-shadow:var(--sh-1)}
+
+/* ---------- end screen ---------- */
+.score{background:var(--surf-1);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:var(--s4);display:flex;flex-direction:column;gap:var(--s3);box-shadow:var(--sh-1)}
+.score.win{background:var(--surf-hot);border:2px solid var(--gold);
+  box-shadow:0 0 30px rgba(255,201,84,.18)}
+.ribbon{display:inline-flex;align-items:center;gap:var(--s2);align-self:flex-start;background:var(--gold);
+  color:#3a2205;font-weight:900;font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;
+  border-radius:var(--r-pill);padding:var(--s1) var(--s3)}
+.score-top{display:flex;align-items:baseline;gap:var(--s3)}
+.score-top .nm{font-weight:900;font-size:1.25rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.score-top .mk{font-weight:900;font-size:1.5rem;color:var(--gold)}
+.score-top .mk small{font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);display:block;text-align:right;font-weight:800}
+.chips{display:flex;flex-wrap:wrap;gap:var(--s2)}
+.chip{display:flex;align-items:center;gap:var(--s2);background:var(--n-800);
+  border:1px solid var(--line);border-radius:var(--r-pill);
+  padding:var(--s1) var(--s3) var(--s1) var(--s1);font-weight:800;font-size:.88rem}
+.chip .ico{width:19px;height:19px;flex:none;color:var(--c)}
+.badges{display:flex;flex-wrap:wrap;gap:var(--s2)}
+/* foil finish: each badge lands, then one shine sweeps across it, once */
+.badge{position:relative;overflow:hidden;opacity:0;
+  background-image:linear-gradient(135deg, rgba(255,255,255,.26), transparent 42%, rgba(0,0,0,.16));
+  animation:badgeIn var(--dur-3) var(--ease) var(--d,0ms) forwards}
+.badge::after{content:'';position:absolute;top:-70%;left:-130%;width:70%;height:240%;
+  transform:rotate(18deg);pointer-events:none;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,.95) 45%, rgba(255,255,255,.5) 60%, transparent);
+  animation:shine var(--dur-4) cubic-bezier(.3,.9,.4,1) calc(var(--d,0ms) + 220ms) forwards}
+/* sparkle that pops as the sweep clears the badge */
+.badge .spark{position:absolute;width:12px;height:12px;pointer-events:none;opacity:0;
+  background:radial-gradient(circle, #fff 0 22%, transparent 60%);
+  animation:spark 600ms ease-out calc(var(--d,0ms) + 620ms) forwards}
+.badge .spark::before,.badge .spark::after{content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent 46%,#fff 50%,transparent 54%)}
+.badge .spark::after{transform:rotate(90deg)}
+.badge .spark.s2{animation-delay:calc(var(--d,0ms) + 760ms);width:9px;height:9px}
+@keyframes spark{0%{opacity:0;transform:scale(.2) rotate(0)}
+  40%{opacity:1;transform:scale(1.15) rotate(35deg)}
+  100%{opacity:0;transform:scale(.5) rotate(70deg)}}
+@keyframes badgeIn{
+  0%{opacity:0;transform:translateY(12px) scale(.88)}
+  55%{opacity:1;transform:translateY(-2px) scale(1.09)}
+  78%{transform:scale(.98)}
+  100%{opacity:1;transform:none}}
+@keyframes shine{0%{left:-130%}70%{left:140%}100%{left:140%}}
+.badge{display:flex;align-items:center;gap:var(--s2);background:var(--c);color:var(--badge-ink);
+  border-radius:var(--r-sm);
+  padding:var(--s2) var(--s3);font-weight:900;font-size:.95rem;
+  box-shadow:var(--sh-2), 0 0 0 1px rgba(255,255,255,.28) inset}
+.badge .ico{width:18px;height:18px;flex:none;color:var(--badge-ink)}
+.badge .ico svg .hl{fill:rgba(255,255,255,.3)}
+.crown{font-size:1rem}
+
+.bust .title{color:var(--heat);text-shadow:0 4px 0 #5a1f12}
+body.restarting #wrap{animation:outToRight 200ms cubic-bezier(.4,0,1,1) forwards}
+hr.sep{border:0;border-top:1px dashed var(--line);margin:var(--s5) 0 var(--s1);width:100%}
+
+/* Narrow phones: the HUD is one row of three fixed things (shift + ticket, sound,
+   heat gauge). Below ~370px the gauge and the padding crowd the left block into
+   wrapping, so both shrink instead — the text never breaks across lines. */
+@media (max-width:369px){
+  #hud{padding:var(--s2);gap:var(--s2)}
+  .shift-tag{font-size:.78rem}
+  #hudProgress{font-size:.68rem;letter-spacing:.04em}
+  .shift-tag::before{width:8px;height:8px;margin-right:var(--s1)}
+  .soundbtn{width:30px;height:30px}
+  .soundbtn svg{width:17px;height:17px}
+  .heat-label{font-size:.56rem;letter-spacing:.08em}
+  .flame{width:17px;height:21px}
+  .pips{gap:3px;padding:3px var(--s1) 2px}
+}
+/* Reveal rows: the station label plus icon and token squeeze the chef's name
+   into an ellipsis ("Alexan...") on any phone under ~410px. The name is what
+   people are looking for, so it keeps the line and the station drops underneath
+   it, aligned to the name. */
+@media (max-width:409px){
+  .pick{flex-wrap:wrap;gap:var(--s1) var(--s2);padding:var(--s2) var(--s3)}
+  .pick > .ico{width:30px;height:30px}
+  .pick .who{font-size:.98rem}
+  .pick .mark-token{order:2;width:26px;height:26px}
+  .pick .mark-token .ico{width:13px;height:13px}
+  .pick .what{order:3;flex-basis:100%;white-space:normal;font-size:.8rem;
+    margin-left:calc(30px + var(--s2));margin-top:-2px}
+}
+
+@media (max-width:339px){
+  .shift-tag{font-size:.72rem}
+  #hudProgress{font-size:.62rem}
+  .flame{width:15px;height:19px}
+  .heat-label{font-size:.52rem}
+
+/* ---------- reduced motion: keep every end state, drop the movement ---------- */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms !important;animation-iteration-count:1 !important;
+    transition-duration:.12s !important}
+  .mark-token,.badge{opacity:1 !important}
+  .badge::after{display:none}
+  #heatFlash.fire{animation:none;opacity:0}
+  .shake{animation:none}
+  .flame.lit,.flame.ignite{filter:drop-shadow(0 0 6px rgba(255,107,53,.8))}
+}
+.foot{margin-top:auto;padding-top:var(--s5)}
+#s-call .foot{position:sticky;bottom:0;padding-bottom:var(--s1);
+  background:linear-gradient(180deg, transparent, rgba(10,13,18,.92) 42%)}
+</style>
+</head>
+<body>
+
+<!-- Per-shift lighting. Prep is warm and calm, Dinner Rush deepens, Closing is
+     the last red bulb over the pass. Cross-fades on the shift change. -->
+<div id="ambient" aria-hidden="true">
+  <div class="amb-steel"></div>
+  <div class="amb-vignette"></div>
+</div>
+<div id="shiftWash" aria-hidden="true"></div>
+<div id="confetti" aria-hidden="true"></div>
+<div id="heatFlash" aria-hidden="true"></div>
+
+<div class="wrap" id="wrap">
+
+  <!-- Kitchen Heat + shift progress: visible to the whole table during play -->
+  <div id="hud">
+    <div class="hud-left">
+      <div class="shift-tag" id="hudShift">Prep Shift</div>
+      <div class="muted" id="hudProgress">Ticket 1 of 20</div>
+    </div>
+    <button id="btnSound" class="soundbtn" type="button" aria-pressed="true" aria-label="Sound on"></button>
+    <div class="hud-right heat-cluster" id="heatCluster">
+      <div class="heat-label">Kitchen Heat</div>
+      <div class="pips" id="pips"></div>
+    </div>
+  </div>
+
+  <!-- 0. HOW TO PLAY — shown on first open, reopenable from setup -->
+  <!-- 0. TITLE — the first screen the app opens on -->
+  <section class="screen active" id="s-title">
+    <div class="title-ambient" aria-hidden="true">
+      <div class="title-glow"></div>
+      <div class="title-wisp"></div>
+      <i class="mote m1"><b></b></i><i class="mote m2"><b></b></i><i class="mote m3"><b></b></i>
+      <i class="mote m4"><b></b></i><i class="mote m5"><b></b></i><i class="mote m6"><b></b></i>
+    </div>
+    <div class="center title-stage">
+      <div>
+        <div class="eyebrow">Service starts now</div>
+        <h1 class="title">Are We <em>Cooked?</em></h1>
+      </div>
+      <p class="sub">One device. Pass it around the table.<br>20 tickets, 3 shifts, don't let the heat hit 5.</p>
+    </div>
+    <div class="foot stack">
+      <button class="btn hot" id="btnTitleStart">Fire it up 🔥</button>
+      <button class="btn-link" id="btnTitleHow" type="button">How to play</button>
+    </div>
+  </section>
+
+  <section class="screen" id="s-tut">
+    <div class="tut">
+      <div class="tut-head">
+        <div class="dots" id="tutDots"></div>
+        <button class="tut-skip" id="btnTutSkip" type="button">I know how to play</button>
+      </div>
+      <div id="tutBody"></div>
+    </div>
+    <div class="foot"><button class="btn hot" id="btnTutNext">Next</button></div>
+  </section>
+
+  <!-- 1. START -->
+  <section class="screen" id="s-start">
+    <button class="helpbtn" id="btnHelp" type="button" aria-label="How to play">?</button>
+    <div class="stack setup-stack">
+      <div>
+        <h2 class="setup-title">How many on the line?</h2>
+        <div class="count-row" id="countRow"></div>
+      </div>
+      <div class="names" id="names"></div>
+      <button class="btn hot" id="btnStart">Fire it up 🔥</button>
+    </div>
+  </section>
+
+  <!-- 2. TICKET UP -->
+  <section class="screen" id="s-ticket">
+    <div class="center stagger">
+      <div class="eyebrow">Head Chef</div>
+      <h2 style="font-size:2rem" id="chefName">—</h2>
+      <div id="ticketSlot" style="width:100%"></div>
+    </div>
+    <div class="stack foot" id="ticketFoot"></div>
+  </section>
+
+  <!-- 3a. PASS -->
+  <section class="screen" id="s-pass">
+    <div class="center">
+      <div style="font-size:3.4rem">🤲</div>
+      <div class="eyebrow">Pass the device to</div>
+      <h2 class="title" style="font-size:clamp(2rem,10vw,3rem)" id="passName">—</h2>
+      <p class="muted">Everyone else: eyes off the screen.</p>
+    </div>
+    <div class="foot"><button class="btn" id="btnPassOk">I'm <span id="passName2">—</span>, tap to call it</button></div>
+  </section>
+
+  <!-- 3b. CALL IT -->
+  <section class="screen" id="s-call">
+    <div class="stack" style="flex:1">
+      <div class="docket slim">
+        <div class="ticket slim">
+          <div style="display:flex;align-items:center;gap:var(--s3)">
+            <div style="font-size:2.2rem" id="callEmoji">😤</div>
+            <div class="line" style="font-size:clamp(1.05rem,4.6vw,1.35rem)" id="callText">—</div>
+          </div>
+        </div>
+      </div>
+      <div class="eyebrow"><span id="callWho">—</span> — call the station</div>
+      <div class="stations" id="stationList"></div>
+    </div>
+    <div class="foot"><button class="btn hot" id="btnLock" disabled>Lock it in</button></div>
+  </section>
+
+  <!-- 4 + 5. FLIP & MARK IT -->
+  <section class="screen" id="s-reveal">
+    <div class="stack" style="flex:1">
+      <div class="docket slim">
+        <div class="ticket slim">
+          <div style="display:flex;align-items:center;gap:var(--s3)">
+            <div style="font-size:2.2rem" id="revEmoji">😤</div>
+            <div class="line" style="font-size:clamp(1.05rem,4.6vw,1.35rem)" id="revText">—</div>
+          </div>
+        </div>
+      </div>
+      <div class="eyebrow">The calls</div>
+      <div class="picks" id="picksList"></div>
+      <div id="answerSlot"></div>
+    </div>
+    <div class="foot stack" id="revealFoot"></div>
+  </section>
+
+  <!-- 7. END — normal finish -->
+  <section class="screen" id="s-end">
+    <div class="center" style="flex:none;margin-bottom:6px">
+      <div class="eyebrow">Service is over</div>
+      <h2 class="title" style="font-size:clamp(2rem,10vw,3rem)">Last<em>Call</em></h2>
+      <p class="muted" id="endHeat">Kitchen Heat finished at 0 of 5.</p>
+    </div>
+    <div class="stack" id="scoreList" style="flex:1"></div>
+    <div class="foot"><button class="btn gold" id="btnRerun">Run it back <span class="btn-ico" id="rerunIco"></span></button></div>
+  </section>
+
+  <!-- 6. END — heat hit 5 -->
+  <section class="screen bust" id="s-bust">
+    <div class="center">
+      <div style="font-size:4rem">🔥🚨🔥</div>
+      <h2 class="title">The kitchen went <em>under</em></h2>
+      <p class="sub">Five tickets nobody called right. Service ends here.</p>
+      <p class="muted" id="bustDetail">—</p>
+      <p class="muted"><b>No Chef of the Night.</b> Everybody lost this one together.</p>
+    </div>
+    <div class="foot"><button class="btn hot" id="btnRefire">Fire a new service 🔥</button></div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+'use strict';
+/* =================================================================
+   DESIGN NOTE — FOR REVIEWERS, NOT FOR PLAYERS.
+   Nothing below this comment block ever reaches the screen.
+
+   The five kitchen stations are a one-to-one skin over the five
+   pillars the assignment is quietly exercising:
+
+     grill         -> self-regulation  (staying steady under heat)
+     prep          -> self-awareness   (check yourself before the line)
+     saute         -> motivation/drive (push through it)
+     garde-manger  -> empathy          (handle the person gently)
+     expo          -> social skill     (say the thing, clearly, out loud)
+
+   Players only ever see stations, calls, Marks and Badges. No pillar
+   names, no scores framed as traits, no clinical vocabulary anywhere
+   in the DOM. Scoring is pure string matching against ticket.station,
+   which is authored data — there is no judge and no subjective call.
+   ================================================================= */
+
+/* ---------- STATIONS (same five in every player's hand, every round) ---------- */
+/* `job` is the one-liner shown under every station name, everywhere the station
+   appears. It describes what the station actually does in a kitchen, in plain
+   language: a player with no restaurant background has to be able to reason from
+   the ticket to the station without already knowing what Garde Manger means. */
+const STATIONS = [
+  { key:'grill',        emoji:'🔥', name:'Grill',
+    job:'Hot, high-pressure cooking that can\'t be rushed.' },
+  { key:'prep',         emoji:'🔪', name:'Prep',
+    job:'Everything made ready before the ticket hits the line.' },
+  { key:'saute',        emoji:'🍳', name:'Sauté',
+    job:'Fast pan work — has to keep moving, no matter what.' },
+  { key:'garde-manger', emoji:'🥗', name:'Garde Manger',
+    job:'The cold station — salads, starters, anything delicate.' },
+  { key:'expo',         emoji:'🔔', name:'Expo',
+    job:'Calls out every ticket, keeps the kitchen in sync.' }
+];
+/* Station silhouettes, 24x24. Deliberately simple outlines: they have to stay
+   legible at 18px in a mark tally and at 46px in the picker. `.hl` is a light
+   inner facet so the solid shape doesn't read as a flat blob. */
+const ICONS = {
+  'grill':
+    '<path d="M16.1 5.9l-.5.6c-1.2 1.5-3.6.6-3.6-1.3V1.8S3.9 6 3.9 13c0 3 1.6 5.5 4 6.9-.6-.8-.9-1.8-.9-2.8 0-1.3.5-2.6 1.5-3.5L12 10l3.5 3.6c1 .9 1.5 2.2 1.5 3.5 0 1-.3 2-.9 2.8 1.9-1.2 3.3-3.1 3.8-5.3.7-3.6-1-7-3.8-8.7z"/>'
+  + '<path class="hl" d="M12 12.3 9.9 14.5c-.6.6-1 1.4-1 2.3 0 1.7 1.4 3.1 3.1 3.1s3.1-1.4 3.1-3.1c0-.9-.4-1.7-1-2.3L12 12.3z"/>',
+  'prep':
+    '<path d="M7 6.6h13.7c.9 0 1.2 1.2.4 1.7l-2.7 1.8c-2.4 1.6-5.2 2.6-8.1 2.9L7 13.2V6.6z"/>'
+  + '<path d="M1.8 8.4h5.3v3.6H1.8a1.8 1.8 0 0 1 0-3.6z"/>'
+  + '<path class="hl" d="M8.3 7.8h10l-1.7 1.1H8.3V7.8z"/>',
+  'saute':
+    '<path d="M2.6 9.4h12.9c.8 0 1.4.7 1.3 1.5a7.8 7.8 0 0 1-15.5 0c-.1-.8.5-1.5 1.3-1.5z"/>'
+  + '<path d="M16.6 9.2 20.3 6.6a1.35 1.35 0 0 1 1.6 2.2l-3.8 2.7c-.3-.8-.8-1.6-1.5-2.3z"/>'
+  + '<path class="hl" d="M3.6 11.2h11.2a5.9 5.9 0 0 1-1.2 2.6H4.8a5.9 5.9 0 0 1-1.2-2.6z"/>',
+  'garde-manger':
+    '<path d="M21 2.6c0 11.2-4.6 17.9-11.5 17.9-1.5 0-2.9-.3-4.1-1 1.8-4.5 5.1-8 9.7-10.4-5.3 1.8-9 5.4-10.9 10.2A7.9 7.9 0 0 1 2.9 14C2.9 7 10 2.6 21 2.6z"/>'
+  + '<path class="hl" d="M19 5.1c-4.4 2.3-7.6 5.3-9.6 9 1.9-3.3 5-6 9.2-8.2z"/>',
+  'expo':
+    '<path d="M12 1.9c-1 0-1.8.8-1.8 1.8v.6C7 5.1 4.9 7.7 4.9 10.9v3.3l-1.6 2.7c-.5.9.1 2 1.1 2h15.2c1 0 1.6-1.1 1.1-2l-1.6-2.7v-3.3c0-3.2-2.1-5.8-5.3-6.6v-.6c0-1-.8-1.8-1.8-1.8z"/>'
+  + '<path d="M9.5 20.1h5a2.5 2.5 0 0 1-5 0z"/>'
+  + '<path class="hl" d="M12 4.6c-3.1 0-5.4 2.5-5.4 6.2v3.5H8.4v-3.5c0-2.8 1.5-4.7 3.6-5.1z"/>'
+};
+const sIcon = key => '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + ICONS[key] + '</svg>';
+
+/* the heat flame is deliberately a different, simpler flame than the Grill
+   station's, so the shared track never reads as one player's station */
+const HEAT_FLAME =
+  '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+  '<path d="M12 1.6c.4 3.3-1.1 4.8-2.6 6.6C7.6 10.4 6 12.3 6 14.8A6 6 0 0 0 12 21a6 6 0 0 0 6-6.2' +
+  'c0-3-1.9-5-3.6-6.8-.3 1.2-1 1.9-1.9 1.9-1 0-1.6-.8-1.6-1.9 0-1.9 1.3-3.3 1.1-6.4z"/></svg>';
+const TOQUE =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 19.4h10.8v2.2H6.6v-2.2z"/>' +
+  '<path d="M12 2.4c-1.9 0-3.3.9-3.9 2.2-2 .1-3.6 1.7-3.6 3.8 0 1.7 1.1 3.1 2.6 3.6v5.9h9.8v-5.9c1.5-.5 2.6-1.9 2.6-3.6 0-2.1-1.6-3.7-3.6-3.8C15.3 3.3 13.9 2.4 12 2.4z"/></svg>';
+const SOUND_ON =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/>' +
+  '<path d="M16.5 8.3a5 5 0 0 1 0 7.4l1.4 1.4a7 7 0 0 0 0-10.2l-1.4 1.4z"/></svg>';
+const SOUND_OFF =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/>' +
+  '<path d="M20.9 9.5 19.5 8.1 17.4 10.2 15.3 8.1 13.9 9.5 16 11.6l-2.1 2.1 1.4 1.4 2.1-2.1 2.1 2.1 1.4-1.4-2.1-2.1 2.1-2.1z"/></svg>';
+
+const ST = Object.fromEntries(STATIONS.map(s => [s.key, s]));
+const COLOR = k => 'var(--' + k + ')';
+
+/* 3+ Marks in one color earns that station's Badge */
+const BADGES = {
+  'grill':'Iron Grill', 'prep':'Mise en Place', 'saute':'Full Send',
+  'garde-manger':'Gentle Hands', 'expo':'On the Pass'
+};
+
+/* ---------- THE 20 TICKETS (station = the one correct call, printed on the card) ---------- */
+const TICKETS = [
+  // Prep Shift (7)
+  { text:"The same order comes back cold, again",
+    emoji:"😤", shift:"Prep Shift", station:"grill" },
+  { text:"Two orders hit at once and everything backs up",
+    emoji:"😰", shift:"Prep Shift", station:"saute" },
+  { text:"The dish machine breaks, plates keep piling up",
+    emoji:"😔", shift:"Prep Shift", station:"prep" },
+  { text:"A plate goes out looking wrong",
+    emoji:"😶", shift:"Prep Shift", station:"expo" },
+  { text:"A regular customer complains, just to complain",
+    emoji:"🙄", shift:"Prep Shift", station:"garde-manger" },
+  { text:"A server rushes in with a last-minute order that's not even on the menu",
+    emoji:"⚡", shift:"Prep Shift", station:"saute" },
+  { text:"The new cook shows up late, no apology",
+    emoji:"🌱", shift:"Prep Shift", station:"prep" },
+  // Dinner Rush (7)
+  { text:"The Head Chef yells at the wrong person",
+    emoji:"😡", shift:"Dinner Rush", station:"expo" },
+  { text:"One of the cooks goes quiet in the middle of the shift",
+    emoji:"😶", shift:"Dinner Rush", station:"garde-manger" },
+  { text:"Your shifts get rearranged and nobody tells you",
+    emoji:"😡", shift:"Dinner Rush", station:"prep" },
+  { text:"We need to talk once the shift's over.",
+    emoji:"😰", shift:"Dinner Rush", station:"grill" },
+  { text:"Your idea for the dish gets shot down fast",
+    emoji:"😔", shift:"Dinner Rush", station:"saute" },
+  { text:"Two cooks stop speaking, mistakes start slipping through",
+    emoji:"🎭", shift:"Dinner Rush", station:"grill" },
+  { text:"You find out people have been talking about you behind your back",
+    emoji:"💬", shift:"Dinner Rush", station:"expo" },
+  // Closing (6)
+  { text:"Someone on the team is about to lose their hours",
+    emoji:"😰", shift:"Closing", station:"expo" },
+  { text:"A cook breaks down in the middle of a busy night",
+    emoji:"😢", shift:"Closing", station:"garde-manger" },
+  { text:"Your role gets changed without anyone asking you",
+    emoji:"😡", shift:"Closing", station:"prep" },
+  { text:"Someone's clearly burnt out and trying to hide it",
+    emoji:"😔", shift:"Closing", station:"garde-manger" },
+  { text:"You have to give someone hard feedback tonight",
+    emoji:"😰", shift:"Closing", station:"saute" },
+  { text:"Months of tension between two cooks finally blow up",
+    emoji:"🎭", shift:"Closing", station:"grill" }
+];
+
+const SHIFT_ORDER = ['Prep Shift','Dinner Rush','Closing'];
+const SHIFT_CLASS = { 'Prep Shift':'shift-prep', 'Dinner Rush':'shift-dinner', 'Closing':'shift-closing' };
+const MAX_HEAT = 5;
+
+/* ---------- state (memory only — nothing is written anywhere) ---------- */
+const S = {
+  players: [],      // { name, marks:{stationKey:count} }
+  deck: [],         // tickets, shifts kept in order, shuffled inside each shift
+  round: 0,
+  headChef: 0,
+  heat: 0,
+  picks: [],        // picks[playerIndex] = stationKey
+  order: [],        // calling order this round, starts with the Head Chef
+  pos: 0
+};
+
+const $ = id => document.getElementById(id);
+
+/* ---------- SFX ----------
+   Four one-shots built with WebAudio so the game stays a single offline file:
+   printer chatter on a ticket pull, the pass bell when the calls are in, a
+   sizzle when a ticket dies, a token clink when Marks land. Audio is additive
+   only — nothing is communicated by sound alone — and it's mutable from the HUD.
+   The context is created on the first tap, so no autoplay policy is tripped. */
+const Sfx = (function(){
+  let ctx = null, on = true;
+  const ready = () => {
+    if (!on) return null;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    if (!ctx) ctx = new AC();
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  };
+  const noise = (c, secs) => {
+    const b = c.createBuffer(1, Math.ceil(c.sampleRate * secs), c.sampleRate);
+    const d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return b;
+  };
+  const tone = (c, freq, t0, dur, type, peak) => {
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(peak, t0 + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g).connect(c.destination);
+    o.start(t0); o.stop(t0 + dur + 0.03);
+  };
+  return {
+    isOn(){ return on; },
+    toggle(){ on = !on; if (!on && ctx) ctx.suspend(); return on; },
+    ticket(){                                   /* thermal printer chatter */
+      const c = ready(); if (!c) return;
+      const t0 = c.currentTime;
+      const src = c.createBufferSource(); src.buffer = noise(c, 0.5);
+      const bp = c.createBiquadFilter(); bp.type = 'bandpass';
+      bp.frequency.value = 1750; bp.Q.value = 1.5;
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      for (let i = 0; i < 9; i++){
+        const t = t0 + i * 0.044;
+        g.gain.setValueAtTime(0.15, t);
+        g.gain.exponentialRampToValueAtTime(0.02, t + 0.03);
+      }
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.47);
+      src.connect(bp).connect(g).connect(c.destination);
+      src.start(t0); src.stop(t0 + 0.5);
+    },
+    ding(){                                     /* bell on the pass */
+      const c = ready(); if (!c) return;
+      const t0 = c.currentTime;
+      tone(c, 988, t0, 0.9, 'sine', 0.2);
+      tone(c, 1480, t0 + 0.004, 0.5, 'sine', 0.09);
+    },
+    sizzle(){                                   /* a ticket dies */
+      const c = ready(); if (!c) return;
+      const t0 = c.currentTime;
+      const src = c.createBufferSource(); src.buffer = noise(c, 0.95);
+      const hp = c.createBiquadFilter(); hp.type = 'highpass';
+      hp.frequency.setValueAtTime(700, t0);
+      hp.frequency.exponentialRampToValueAtTime(3400, t0 + 0.8);
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.19, t0 + 0.05);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.88);
+      src.connect(hp).connect(g).connect(c.destination);
+      src.start(t0); src.stop(t0 + 0.95);
+    },
+    clink(n){                                   /* Marks stacking up */
+      const c = ready(); if (!c) return;
+      const t0 = c.currentTime, count = Math.max(1, Math.min(n || 1, 4));
+      for (let i = 0; i < count; i++){
+        const t = t0 + i * 0.09;
+        tone(c, 2100 - i * 95, t, 0.13, 'triangle', 0.11);
+        tone(c, 3150 - i * 130, t, 0.07, 'triangle', 0.045);
+      }
+    }
+  };
+})();
+/* "a Grill Mark" but "an Expo Mark" — a first-letter test is enough for these five
+   station names; none of them start with a silent-h or a vowel-that-sounds-like-a
+   consonant, so there is no need for anything smarter. */
+const article = name => /^[aeiou]/i.test(name) ? 'an' : 'a';
+const shuffle = a => { const x = a.slice(); for (let i = x.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [x[i], x[j]] = [x[j], x[i]]; } return x; };
+const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* Every screen puts its primary button in the same place, so a double tap —
+   which this game gets constantly, phone going hand to hand — would land the
+   second tap on the NEXT screen's button. On "Lock it in" that skipped the
+   pass-the-device screen entirely and showed the next chef's picker to whoever
+   was still holding the phone. Taps are ignored for a beat after any screen
+   change; the transition itself is 220ms. */
+let inputLockedUntil = 0;
+document.addEventListener('click', e => {
+  if (performance.now() < inputLockedUntil){
+    e.stopPropagation();
+    e.preventDefault();
+  }
+}, true);
+
+/* show(id, dir) — 'fwd' pushes the old screen left, 'back' reverses it.
+   The outgoing screen is pinned at its measured position for 160ms so nothing
+   reflows while it leaves. */
+function show(id, dir){
+  dir = dir || 'fwd';
+  inputLockedUntil = performance.now() + 260;
+  const next = document.getElementById(id);
+  const cur = document.querySelector('.screen.active');
+  const wrap = $('wrap');
+
+  document.querySelectorAll('.screen.leaving').forEach(clearLeaving);
+
+  if (cur && cur !== next && !reduceMotion()){
+    const r = cur.getBoundingClientRect(), w = wrap.getBoundingClientRect();
+    cur.style.top = (r.top - w.top) + 'px';
+    cur.style.left = (r.left - w.left) + 'px';
+    cur.style.width = r.width + 'px';
+    cur.style.height = r.height + 'px';
+    cur.classList.remove('active');
+    cur.classList.add('leaving', dir === 'back' ? 'out-back' : 'out-fwd');
+    setTimeout(() => clearLeaving(cur), 170);
+  } else if (cur) {
+    cur.classList.remove('active');
+  }
+
+  document.querySelectorAll('.screen').forEach(sc => {
+    if (sc !== next && !sc.classList.contains('leaving')) sc.classList.remove('active');
+  });
+  next.classList.remove('in-fwd', 'in-back');
+  void next.offsetWidth;
+  next.classList.add('active', dir === 'back' ? 'in-back' : 'in-fwd');
+  window.scrollTo(0, 0);
+}
+function clearLeaving(el){
+  /* Only ever unwinds the leaving state. It must not touch 'active': a screen
+     can be shown again before its own cleanup timer fires (pass -> call -> pass
+     inside 170ms), and stripping 'active' there would blank the app. */
+  if (!el || !el.classList.contains('leaving')) return;
+  el.classList.remove('leaving', 'out-fwd', 'out-back');
+  el.style.top = el.style.left = el.style.width = el.style.height = '';
+}
+
+/* ================= START SCREEN ================= */
+let playerCount = 4;
+let savedNames = null;
+const DEFAULT_NAMES = ['Chef 1','Chef 2','Chef 3','Chef 4','Chef 5'];
+const TABLE_KEY = 'awc-table';   /* names + count, parked for this session only */
+
+/* "Run it back" reloads the page, so the table is restored from the session on
+   the way back in — the same table, not a fresh set of Chef 1..5. */
+(function restoreTable(){
+  let saved = null;
+  try { saved = JSON.parse(sessionStorage.getItem(TABLE_KEY) || 'null'); } catch (e) {}
+  if (Array.isArray(saved) && saved.length >= 3 && saved.length <= 5){
+    playerCount = saved.length;
+    savedNames = saved;
+  }
+})();
+
+function buildStart(){
+  $('countRow').innerHTML = '';
+  [3,4,5].forEach(n => {
+    const b = document.createElement('button');
+    b.className = 'count' + (n === playerCount ? ' sel' : '');
+    b.textContent = n;
+    b.onclick = () => { playerCount = n; buildStart(); };
+    $('countRow').appendChild(b);
+  });
+  const prev = [...document.querySelectorAll('#names input')].map(i => i.value);
+  $('names').innerHTML = '';
+  for (let i = 0; i < playerCount; i++){
+    const row = document.createElement('label');
+    row.className = 'name-row';
+    row.innerHTML = '<span>👨‍🍳</span>';
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.maxLength = 14;
+    inp.value = prev[i] || (savedNames && savedNames[i]) || DEFAULT_NAMES[i];
+    inp.setAttribute('aria-label', 'Player ' + (i + 1) + ' name');
+    row.appendChild(inp);
+    $('names').appendChild(row);
+  }
+}
+buildStart();
+
+$('btnStart').onclick = () => {
+  const names = [...document.querySelectorAll('#names input')]
+    .map((inp, i) => (inp.value.trim() || DEFAULT_NAMES[i]).slice(0, 14));
+  /* "Run it back" reloads the page, so the table is parked for this session
+     only — like the tutorial flag, it dies with the tab. */
+  try { sessionStorage.setItem(TABLE_KEY, JSON.stringify(names)); } catch (e) {}
+  S.players = names.map(n => ({
+    name: n,
+    marks: Object.fromEntries(STATIONS.map(s => [s.key, 0]))
+  }));
+  S.deck = SHIFT_ORDER.flatMap(sh => shuffle(TICKETS.filter(t => t.shift === sh)));
+  S.round = 0; S.heat = 0; S.headChef = 0;
+  $('hud').classList.add('on');
+  beginRound();
+};
+
+/* ================= HOW TO PLAY =================
+   Four cards, skimmable. Everything on them is built from the same STATIONS /
+   BADGES / MAX_HEAT data and the same sIcon() the game screens use — the
+   tutorial holds no copy of the game's content of its own. */
+const TUT = [
+  () =>
+    '<h2>One phone, one shift</h2>' +
+    '<p>A pass-and-play party game for the table. No accounts, no second device — ' +
+    'the phone just goes round.</p>' +
+    '<p>You\'re all on the line at the same restaurant, working through a night of ' +
+    'service. Get through it together, or <b>the kitchen goes under</b>.</p>',
+
+  () =>
+    '<h2>Your five stations</h2>' +
+    '<p>Every chef holds all five, every round. One of them is the right call for ' +
+    'each ticket.</p>' +
+    '<div class="tut-legend">' +
+    STATIONS.map(st =>
+      '<div class="tut-station" style="--c:' + COLOR(st.key) + '">' +
+      '<span class="ico">' + sIcon(st.key) + '</span>' +
+      '<span><b>' + st.name + '</b><span>' + st.job + '</span></span></div>'
+    ).join('') + '</div>',
+
+  () =>
+    '<h2>How a round works</h2>' +
+    '<div class="tut-steps">' +
+    '<div class="tut-step"><i>01</i><span>The <b>Head Chef</b> pulls a ticket and reads ' +
+    'it out loud. The role rotates every ticket.</span></div>' +
+    '<div class="tut-step"><i>02</i><span>The phone passes to each chef in turn. ' +
+    '<b>Privately</b>, you pick the one station that should handle it, then pass it on.</span></div>' +
+    '<div class="tut-step"><i>03</i><span>Once everyone has called it, <b>all picks are ' +
+    'revealed at once</b>.</span></div>' +
+    '<div class="tut-step"><i>04</i><span>Everyone who called it right takes a <b>Mark</b> ' +
+    'in that station\'s colour. If nobody got it, <b>Kitchen Heat</b> goes up one.</span></div>' +
+    '</div>',
+
+  () => {
+    const flames = Array.from({length: MAX_HEAT},
+      () => '<span class="flame lit">' + HEAT_FLAME + '</span>').join('');
+    const marks = Array.from({length: 3},
+      () => '<span class="mark-token" style="--c:' + COLOR('grill') + '">' +
+            '<span class="ico">' + sIcon('grill') + '</span></span>').join('');
+    return '<h2>Making it through service</h2>' +
+      '<div class="tut-demo"><span class="pips" style="--fill:100%">' + flames + '</span>' +
+      '<span class="cap">Kitchen Heat fills to ' + MAX_HEAT +
+      ' and service ends there — <b>everyone loses together</b>.</span></div>' +
+      '<p>Survive all 20 tickets across <b>Prep Shift</b>, <b>Dinner Rush</b> and ' +
+      '<b>Closing</b> and you\'ve made it through the night.</p>' +
+      '<div class="tut-demo"><span class="tut-marks">' + marks + '</span>' +
+      '<span class="cap">3+ Marks of one colour earns that station\'s Badge.</span></div>' +
+      '<div class="badges"><span class="badge" style="--c:' + COLOR('grill') + '">' +
+      '<span class="ico">' + sIcon('grill') + '</span>' + BADGES['grill'] + '</span></div>' +
+      '<p>Most Marks at the end is <b>Chef of the Night</b>.</p>';
+  }
+];
+
+let tutStep = 0;
+/* sessionStorage, not localStorage: the tutorial stays out of the way for this
+   session (including reloads) but nothing survives the tab closing, which is the
+   game's standing no-persistence rule. */
+/* The tutorial is opt-in: "How to play" on the title screen, or the ? on setup.
+   It no longer opens itself on first load, so there is no "seen" flag any more. */
+
+function renderTut(){
+  /* alternate the tilt card to card, the same way the ticket rail does */
+  const tilt = [(-1.1), 0.9, -0.8, 1.1][tutStep % 4] + 'deg';
+  $('tutBody').innerHTML =
+    '<div class="docket tut-slide" style="--tilt:' + tilt + '">' +
+    '<div class="ticket tut-ticket">' + TUT[tutStep]() + '</div></div>';
+  $('tutDots').innerHTML = TUT.map((_, i) =>
+    '<span class="dot' + (i === tutStep ? ' on' : '') + '"></span>').join('');
+  const last = tutStep === TUT.length - 1;
+  $('btnTutNext').textContent = last ? "Let's cook 🔥" : 'Next';
+  $('btnTutSkip').hidden = last;
+}
+function openTutorial(){ tutStep = 0; renderTut(); show('s-tut'); }
+function closeTutorial(){ show('s-start', 'back'); }
+
+/* The flow is linear: title -> tutorial -> setup. Both title-screen controls
+   lead to the tutorial; the tutorial's own CTA (or its skip) carries on to
+   setup, so setup is never reached without passing through the tutorial. */
+$('btnTitleStart').onclick = () => openTutorial();
+$('btnTitleHow').onclick   = () => openTutorial();
+
+$('btnTutNext').onclick = () => {
+  if (tutStep < TUT.length - 1){ tutStep++; renderTut(); Sfx.ticket(); }
+  else closeTutorial();
+};
+$('btnTutSkip').onclick = closeTutorial;
+$('btnHelp').onclick = openTutorial;
+
+/* ================= SOUND TOGGLE ================= */
+function paintSound(){
+  const b = $('btnSound'), on = Sfx.isOn();
+  b.innerHTML = on ? SOUND_ON : SOUND_OFF;
+  b.setAttribute('aria-pressed', String(on));
+  b.setAttribute('aria-label', on ? 'Sound on' : 'Sound off');
+}
+$('rerunIco').innerHTML = sIcon('saute');   /* same pan the Sauté station uses */
+/* a restart is a "back" move: the room slides out the way it came in */
+const restart = () => {
+  if (reduceMotion()) return location.reload();
+  document.body.classList.add('restarting');
+  setTimeout(() => location.reload(), 190);
+};
+$('btnRerun').onclick = restart;
+$('btnRefire').onclick = restart;
+document.body.className = SHIFT_CLASS['Prep Shift'];  /* the room is lit from the title on */
+$('btnSound').onclick = () => { Sfx.toggle(); paintSound(); if (Sfx.isOn()) Sfx.ding(); };
+paintSound();
+
+/* ================= HUD ================= */
+function renderHud(){
+  const t = S.deck[Math.min(S.round, S.deck.length - 1)];
+  $('wrap').className = 'wrap ' + SHIFT_CLASS[t.shift];
+  const turned = document.body.className && document.body.className !== SHIFT_CLASS[t.shift];
+  document.body.className = SHIFT_CLASS[t.shift];   /* cross-fades the ambient light */
+  if (turned){
+    /* the lights change over the pass: one wash + the shift tag kicks */
+    const w = $('shiftWash');
+    w.classList.remove('on'); void w.offsetWidth; w.classList.add('on');
+    const tag = $('hudShift');
+    tag.classList.remove('shift-turn'); void tag.offsetWidth; tag.classList.add('shift-turn');
+    Sfx.ding();
+  }
+  $('hudShift').textContent = t.shift;
+  $('hudProgress').textContent = 'Ticket ' + (S.round + 1) + ' of ' + S.deck.length;
+  $('pips').innerHTML = '';
+  for (let i = 0; i < MAX_HEAT; i++){
+    const f = document.createElement('span');
+    f.className = 'flame' + (i < S.heat ? ' lit' : '');
+    f.style.animationDelay = (-0.8 * i) + 's';   /* desync the flicker */
+    f.innerHTML = HEAT_FLAME;
+    $('pips').appendChild(f);
+  }
+  $('pips').style.setProperty('--fill', (S.heat / MAX_HEAT * 100) + '%');
+  $('heatCluster').classList.toggle('hot', S.heat >= 3);
+}
+
+/* The kitchen reacts: the new flame ignites, the room flashes red, the pass
+   shakes once. Sound and shake both no-op under prefers-reduced-motion / mute. */
+function igniteHeat(){
+  const f = $('pips').children[S.heat - 1];
+  if (f) f.classList.add('ignite');
+  const flash = $('heatFlash');
+  flash.classList.remove('fire'); void flash.offsetWidth; flash.classList.add('fire');
+  const w = $('wrap');
+  w.classList.remove('shake'); void w.offsetWidth; w.classList.add('shake');
+  const vig = document.querySelector('.amb-vignette');
+  vig.classList.remove('surge'); void vig.offsetWidth; vig.classList.add('surge');
+  setTimeout(() => vig.classList.remove('surge'), 640);
+  Sfx.sizzle();
+}
+
+/* ================= 2. TICKET UP ================= */
+function beginRound(){
+  S.picks = new Array(S.players.length).fill(null);
+  S.order = S.players.map((_, i) => (S.headChef + i) % S.players.length);
+  S.pos = 0;
+  renderHud();
+
+  $('chefName').textContent = S.players[S.headChef].name;
+  $('ticketFoot').innerHTML = '';
+  $('ticketSlot').innerHTML =
+    '<button class="facedown" id="btnFlipTicket">Tap to pull the ticket' +
+    '<small>then read it out loud to the table</small></button>';
+  $('btnFlipTicket').onclick = revealTicket;
+  show('s-ticket', 'fwd');
+}
+
+function revealTicket(){
+  Sfx.ticket();
+  const t = S.deck[S.round];
+  /* alternate the tilt each ticket so the rail never looks machine-stacked */
+  const tilt = (S.round % 2 ? '2.6deg' : '-3deg');
+  $('ticketSlot').innerHTML =
+    '<div class="docket" style="--tilt:' + tilt + '">' +
+    '<div class="ticket"><span class="emoji">' + t.emoji + '</span>' +
+    '<div class="line">' + esc(t.text) + '</div>' +
+    '<div class="stub">' + t.shift + ' &middot; Ticket ' + (S.round + 1) + '/' + S.deck.length +
+    '</div></div></div>';
+  $('ticketFoot').innerHTML =
+    '<p class="muted" style="text-align:center;margin:0 0 4px">Read it out, then start passing.</p>' +
+    '<button class="btn hot" id="btnStartCalls">Everybody call it</button>';
+  $('btnStartCalls').onclick = nextCaller;
+}
+
+/* ================= 3. CALL IT (pass, pick, confirm) ================= */
+function nextCaller(){
+  if (S.pos >= S.order.length){ startReveal(); return; }
+  const p = S.players[S.order[S.pos]];
+  $('passName').textContent = p.name;
+  $('passName2').textContent = p.name;
+  show('s-pass', 'fwd');
+}
+
+$('btnPassOk').onclick = () => {
+  const t = S.deck[S.round];
+  const idx = S.order[S.pos];
+  let sel = null;
+
+  $('callEmoji').textContent = t.emoji;
+  $('callText').textContent = t.text;
+  $('callWho').textContent = S.players[idx].name;
+  $('btnLock').disabled = true;
+  $('btnLock').classList.remove('armed');
+  $('btnLock').textContent = 'Lock it in';
+
+  $('stationList').innerHTML = '';
+  STATIONS.forEach(s => {
+    const b = document.createElement('button');
+    b.className = 'station';
+    b.style.setProperty('--c', COLOR(s.key));
+    b.innerHTML = '<span class="ico">' + sIcon(s.key) + '</span>' +
+                  '<span><span class="nm">' + s.name + '</span><br>' +
+                  '<span class="job">' + s.job + '</span></span>';
+    b.onclick = () => {
+      sel = s.key;
+      [...$('stationList').children].forEach(c => c.classList.remove('sel'));
+      b.classList.add('sel');
+      $('btnLock').disabled = false;
+      $('btnLock').textContent = 'Lock in ' + s.name;
+      $('btnLock').classList.remove('armed'); void $('btnLock').offsetWidth;
+      $('btnLock').classList.add('armed');
+    };
+    $('stationList').appendChild(b);
+  });
+
+  $('btnLock').onclick = () => {
+    if (!sel) return;
+    S.picks[idx] = sel;
+    S.pos++;
+    nextCaller();
+  };
+  show('s-call', 'fwd');
+};
+
+/* ================= 4 + 5. FLIP, THEN MARK IT ================= */
+function startReveal(){
+  Sfx.ding();
+  const t = S.deck[S.round];
+  $('revEmoji').textContent = t.emoji;
+  $('revText').textContent = t.text;
+  $('answerSlot').innerHTML = '';
+
+  // everyone's call, revealed at once — answer still face down
+  $('picksList').innerHTML = '';
+  let dealt = 0;
+  S.order.forEach(i => {
+    const s = ST[S.picks[i]];
+    const d = document.createElement('div');
+    d.className = 'pick dealing';
+    d.style.animationDelay = (dealt++ * 95) + 'ms';
+    d.dataset.p = i;
+    d.style.setProperty('--c', COLOR(s.key));
+    d.innerHTML = '<span class="ico">' + sIcon(s.key) + '</span>' +
+                  '<span class="who"><b>' + esc(S.players[i].name) + '</b>' +
+                  (i === S.headChef
+                    ? '<span class="hc" title="Head Chef" aria-label="Head Chef">' + TOQUE + '</span>'
+                    : '') + '</span>' +
+                  '<span class="what">' + s.name + '</span>';
+    $('picksList').appendChild(d);
+  });
+
+  /* suspense beat: the button only arrives once every call is face up */
+  const dealMs = 260 + dealt * 95;
+  $('revealFoot').innerHTML = '<div class="revealing" style="text-align:center">Revealing the calls…</div>';
+  show('s-reveal', 'fwd');
+  setTimeout(() => {
+    if (!$('s-reveal').classList.contains('active')) return;
+    $('revealFoot').innerHTML = '<button class="btn gold" id="btnFlipAnswer">Flip the ticket over</button>';
+    $('btnFlipAnswer').onclick = scoreRound;
+    Sfx.clink(1);
+  }, dealMs);
+}
+
+function scoreRound(){
+  const t = S.deck[S.round];
+  const s = ST[t.station];
+  const hits = S.order.filter(i => S.picks[i] === t.station);
+
+  // pure matching against the station printed on the ticket — no judging
+  hits.forEach(i => S.players[i].marks[t.station]++);
+  if (hits.length === 0) S.heat++;
+
+  let landed = 0;
+  [...$('picksList').children].forEach(el => {
+    const matched = S.picks[+el.dataset.p] === t.station;
+    el.classList.add(matched ? 'hit' : 'miss');
+    if (matched){
+      el.insertAdjacentHTML('beforeend',
+        '<span class="mark-token" style="--c:' + COLOR(t.station) + ';--d:' + (landed * 95) + 'ms">' +
+        '<span class="ico">' + sIcon(t.station) + '</span></span>');
+      landed++;
+    }
+  });
+
+  let html = '<div class="answer" style="--c:' + COLOR(s.key) + '">' +
+      '<div class="lbl">The ticket had it as</div>' +
+      '<div class="big"><span class="ico">' + sIcon(s.key) + '</span>' + s.name + '</div>' +
+      '<div class="job">' + s.job + '</div></div>';
+  if (hits.length === 0){
+    html += '<div class="burn" style="margin-top:10px">🔥 Nobody called it. Kitchen Heat is now ' +
+            S.heat + ' of ' + MAX_HEAT + '.</div>';
+  } else {
+    const nm = hits.map(i => esc(S.players[i].name)).join(', ');
+    html += '<p class="muted" style="text-align:center;margin:10px 0 0">' + nm +
+            (hits.length === 1 ? ' takes' : ' each take') + ' ' + article(s.name) +
+            ' ' + s.name + ' Mark.</p>';
+  }
+  $('answerSlot').innerHTML = html;
+
+  renderHud();
+  if (hits.length === 0) igniteHeat();
+  else Sfx.clink(hits.length);
+
+  const last = S.round >= S.deck.length - 1;
+  const bust = S.heat >= MAX_HEAT;
+  const label = bust ? 'See the damage' : (last ? 'Close out the night' : 'Next ticket');
+  $('revealFoot').innerHTML = '<button class="btn" id="btnNext">' + label + '</button>';
+  $('btnNext').onclick = () => {
+    if (bust) return endBust();
+    if (last) return endGame();
+    S.round++;
+    S.headChef = (S.headChef + 1) % S.players.length;
+    beginRound();
+  };
+}
+
+/* ================= 6. HEAT HIT 5 — shared loss ================= */
+function endBust(){
+  $('hud').classList.remove('on');
+  document.body.className = SHIFT_CLASS['Closing'];   /* the room drops to its darkest */
+  $('bustDetail').textContent =
+    'You made it through ' + (S.round + 1) + ' of ' + S.deck.length + ' tickets on the ' +
+    S.deck[S.round].shift + '.';
+  show('s-bust', 'fwd');
+  /* the hit lands first, the reflection rises after it */
+  const flash = $('heatFlash'), w = $('wrap');
+  flash.classList.remove('fire'); void flash.offsetWidth; flash.classList.add('fire');
+  w.classList.remove('bust-hit'); void w.offsetWidth; w.classList.add('bust-hit');
+  setTimeout(() => w.classList.remove('bust-hit'), 560);
+  Sfx.sizzle();
+}
+
+/* ================= 7. END SCREEN — normal finish ================= */
+function endGame(){
+  $('hud').classList.remove('on');
+  $('endHeat').textContent = 'Kitchen Heat finished at ' + S.heat + ' of ' + MAX_HEAT + '. You survived it.';
+
+  const totals = S.players.map(p => STATIONS.reduce((n, s) => n + p.marks[s.key], 0));
+  const best = Math.max(...totals);
+
+  const rows = S.players.map((p, i) => ({ p, i, total: totals[i] }))
+                        .sort((a, b) => b.total - a.total);
+
+  $('scoreList').innerHTML = '';
+  rows.forEach((r, idx) => {
+    const winner = r.total === best;
+    const el = document.createElement('div');
+    el.className = 'score' + (winner ? ' win' : '');
+    el.style.setProperty('--d', (260 + idx * 110) + 'ms');
+
+    const earned = STATIONS.filter(s => r.p.marks[s.key] >= 3);
+    const chips = STATIONS.filter(s => r.p.marks[s.key] > 0).map(s =>
+      '<span class="chip" style="--c:' + COLOR(s.key) + '"><span class="ico">' + sIcon(s.key) + '</span>' +
+      s.name + ' ' + r.p.marks[s.key] + '</span>'
+    ).join('');
+
+    el.innerHTML =
+      (winner ? '<div class="ribbon">👑 Chef of the Night</div>' : '') +
+      '<div class="score-top">' +
+        '<span class="nm">' + esc(r.p.name) + '</span>' +
+        '<span class="mk">' + r.total + '<small>Marks</small></span>' +
+      '</div>' +
+      (chips ? '<div class="chips">' + chips + '</div>'
+             : '<div class="muted">No Marks tonight. Rough service.</div>') +
+      (earned.length
+        ? '<div class="badges">' + earned.map((s, bi) =>
+            '<span class="badge" style="--c:' + COLOR(s.key) + ';--d:' + (bi * 140) + 'ms">' +
+            '<span class="ico">' + sIcon(s.key) + '</span>' + BADGES[s.key] +
+            '<i class="spark" style="top:14%;left:18%"></i>' +
+            '<i class="spark s2" style="top:52%;left:76%"></i></span>'
+          ).join('') + '</div>'
+        : '');
+    $('scoreList').appendChild(el);
+  });
+  show('s-end', 'fwd');
+  confetti(34);
+  Sfx.ding();
+}
+
+/* a contained burst — pieces are removed once they have fallen */
+function confetti(count){
+  if (reduceMotion()) return;
+  const host = $('confetti');
+  const colors = STATIONS.map(st => COLOR(st.key)).concat(['var(--gold)', 'var(--ember)']);
+  let html = '';
+  for (let i = 0; i < count; i++){
+    const left = Math.random() * 100;
+    const delay = Math.round(Math.random() * 520);
+    const dur = 1500 + Math.round(Math.random() * 1100);
+    const rot = Math.round(Math.random() * 900 - 450);
+    const w = 6 + Math.round(Math.random() * 5);
+    html += '<i style="left:' + left.toFixed(1) + '%;width:' + w + 'px;background:' + colors[i % colors.length] +
+            ';animation-delay:' + delay + 'ms;animation-duration:' + dur + 'ms;--rot:' + rot + 'deg"></i>';
+  }
+  host.innerHTML = html;
+  clearTimeout(confetti._t);
+  confetti._t = setTimeout(() => { host.innerHTML = ''; }, 3400);
+}
+
+function esc(str){
+  return String(str).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+}
+
+/* ================= DEV HOOKS =================
+   Nothing above this point touches `window` — the game lives entirely inside this
+   IIFE, so a normal load exposes no globals at all (no window.endGame).
+   QA can opt in by loading the page as index.html?dev=1 (or #dev), which attaches
+   the shortcuts under a single namespaced object:
+
+     __cooked.endGame()    jump straight to the end-of-service screen
+     __cooked.endBust()    jump straight to the kitchen-went-under screen
+     __cooked.state        live game state (players, marks, heat, deck, picks)
+     __cooked.give(playerIndex, stationKey, n)  hand out Marks to set up a scenario
+
+   A player opening index.html normally gets none of this.
+   ============================================= */
+const DEV = /[?&]dev=1(?:&|$)/.test(location.search) || location.hash === '#dev';
+if (DEV){
+  window.__cooked = {
+    state: S,
+    STATIONS: STATIONS,
+    TICKETS: TICKETS,
+    BADGES: BADGES,
+    endGame: endGame,
+    endBust: endBust,
+    give: (i, key, n) => { S.players[i].marks[key] += (n === undefined ? 1 : n); return S.players[i].marks; }
+  };
+  console.info('[are we cooked?] dev hooks attached at window.__cooked');
+}
+})();
+</script>
+</body>
+</html>
